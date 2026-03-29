@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Own Voice TTS — Speak in Your Clone</title>
+  <meta name="description" content="Local AI text-to-speech that clones your voice using Chatterbox TTS. No API keys, no cloud." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:            #0b0d14;
+      --surface:       #13162099;
+      --surface-solid: #131620;
+      --border:        #ffffff15;
+      --accent:        #7c5cfc;
+      --accent-glow:   #7c5cfc55;
+      --accent-light:  #a688fd;
+      --green:         #22c55e;
+      --yellow:        #f59e0b;
+      --red:           #ef4444;
+      --text:          #e8eaf6;
+      --muted:         #6b7280;
+      --radius:        14px;
+      --card-shadow:   0 4px 48px #00000080;
+      --transition:    220ms cubic-bezier(.4,0,.2,1);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, #3b2d7855 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, #1e3a8a22 0%, transparent 60%),
+        var(--bg);
+    }
+
+    /* ── Animated background grid ─────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: -1;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, white, transparent);
+    }
+
+    /* ── Card ─────────────────────────────────────────────────────────── */
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: var(--surface);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) * 1.5);
+      box-shadow: var(--card-shadow);
+      padding: 40px 44px;
+      animation: slideUp .45s ease both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #5b3fd4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 24px var(--accent-glow);
+      flex-shrink: 0;
+    }
+
+    .logo-text h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1.2;
+    }
+
+    .logo-text p {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Status Badge ─────────────────────────────────────────────────── */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff0a;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: .78rem;
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background var(--transition);
+    }
+
+    .dot.loading { background: var(--yellow); animation: pulse 1.2s infinite; }
+    .dot.ready   { background: var(--green); }
+    .dot.error   { background: var(--red); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1 } 50% { opacity: .35 }
+    }
+
+    .device-badge {
+      font-size: .7rem;
+      color: var(--muted);
+      background: #ffffff08;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 7px;
+      margin-left: 4px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    /* ── Textarea ─────────────────────────────────────────────────────── */
+    .input-section { margin-bottom: 20px; }
+
+    .input-label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    textarea#textInput {
+      width: 100%;
+      min-height: 140px;
+      background: #ffffff08;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .97rem;
+      line-height: 1.65;
+      padding: 16px 18px;
+      resize: vertical;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+    }
+
+    textarea#textInput::placeholder { color: var(--muted); }
+
+    textarea#textInput:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    textarea#textInput:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .char-count {
+      font-size: .74rem;
+      color: var(--muted);
+      text-align: right;
+      margin-top: 6px;
+    }
+
+    /* ── Generate Button ──────────────────────────────────────────────── */
+    .actions { display: flex; gap: 12px; margin-bottom: 24px; }
+
+    button#generateBtn {
+      flex: 1;
+      background: linear-gradient(135deg, var(--accent) 0%, #5b3fd4 100%);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 15px 24px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: filter var(--transition), transform var(--transition), opacity var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    button#generateBtn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, #ffffff20, transparent);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    button#generateBtn:hover:not(:disabled)::after { opacity: 1; }
+    button#generateBtn:hover:not(:disabled) {
+      filter: brightness(1.12);
+      transform: translateY(-1px);
+    }
+    button#generateBtn:active:not(:disabled) { transform: translateY(0); }
+
+    button#generateBtn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+      filter: none;
+      transform: none;
+    }
+
+    .btn-icon { font-size: 1.1em; }
+
+    /* ── Progress ─────────────────────────────────────────────────────── */
+    .progress-section {
+      display: none;
+      margin-bottom: 24px;
+    }
+    .progress-section.visible { display: block; }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .progress-label {
+      font-size: .85rem;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .progress-pct {
+      font-size: .8rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-track {
+      height: 8px;
+      background: #ffffff10;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-light));
+      transition: width .4s ease;
+      width: 0%;
+      position: relative;
+    }
+
+    .progress-fill::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, #ffffff50, transparent);
+      animation: shimmer 1.6s infinite;
+    }
+
+    @keyframes shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(200%); }
+    }
+
+    /* ── Audio Player ─────────────────────────────────────────────────── */
+    .audio-section {
+      display: none;
+      margin-bottom: 20px;
+    }
+    .audio-section.visible { display: block; }
+
+    .audio-heading {
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .audio-player-wrap {
+      background: #ffffff08;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .play-btn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #5b3fd4);
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      transition: transform var(--transition), filter var(--transition);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+    .play-btn:hover { transform: scale(1.08); filter: brightness(1.15); }
+
+    .waveform-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    audio#audioPlayer {
+      width: 100%;
+      height: 32px;
+      outline: none;
+      border-radius: 6px;
+      accent-color: var(--accent);
+    }
+
+    audio#audioPlayer::-webkit-media-controls-panel {
+      background: transparent;
+    }
+
+    .download-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 8px 12px;
+      font-size: .8rem;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .download-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* ── Error ────────────────────────────────────────────────────────── */
+    .error-box {
+      display: none;
+      background: #ef444415;
+      border: 1px solid #ef444440;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-size: .87rem;
+      color: #fca5a5;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+    .error-box.visible { display: flex; gap: 10px; align-items: flex-start; }
+    .error-icon { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      font-size: .72rem;
+      color: var(--muted);
+      background: #ffffff08;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 10px;
+      letter-spacing: .03em;
+    }
+
+    /* ── Waveform animation (decorative) ──────────────────────────────── */
+    .waveform-bars {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 20px;
+    }
+    .waveform-bars span {
+      display: inline-block;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      opacity: .6;
+      animation: barPulse 1s ease-in-out infinite both;
+    }
+    .waveform-bars span:nth-child(1) { animation-delay: 0s; }
+    .waveform-bars span:nth-child(2) { animation-delay: .1s; }
+    .waveform-bars span:nth-child(3) { animation-delay: .2s; }
+    .waveform-bars span:nth-child(4) { animation-delay: .3s; }
+    .waveform-bars span:nth-child(5) { animation-delay: .15s; }
+
+    @keyframes barPulse {
+      0%, 100% { height: 4px; }
+      50%       { height: 18px; }
+    }
+
+    .waveform-bars.idle span { animation-play-state: paused; height: 8px; }
+  </style>
+</head>
+<body>
+
+<main class="card" role="main">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon" aria-hidden="true">🎙️</div>
+      <div class="logo-text">
+        <h1>Own Voice TTS</h1>
+        <p>Local · Private · Cloned Voice</p>
+      </div>
+    </div>
+
+    <div id="statusBadge" class="status-badge" aria-live="polite">
+      <span class="dot loading" id="statusDot"></span>
+      <span id="statusText">Initialising…</span>
+      <span class="device-badge" id="deviceBadge">?</span>
+    </div>
+  </div>
+
+  <!-- Text Input -->
+  <div class="input-section">
+    <label class="input-label" for="textInput">Your Text</label>
+    <textarea
+      id="textInput"
+      placeholder="Type or paste any text here — short, long, or multi-paragraph. Your cloned voice will speak it."
+      disabled
+      aria-label="Text to synthesise"
+      maxlength="10000"
+    ></textarea>
+    <div class="char-count"><span id="charCount">0</span> / 10000</div>
+  </div>
+
+  <!-- Generate Button -->
+  <div class="actions">
+    <button id="generateBtn" disabled aria-label="Generate speech from your cloned voice">
+      <span class="btn-icon" aria-hidden="true">✨</span>
+      <span id="btnLabel">Generate Speech</span>
+      <div class="waveform-bars idle" id="waveformBars" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </button>
+  </div>
+
+  <!-- Progress -->
+  <section class="progress-section" id="progressSection" aria-label="Generation progress">
+    <div class="progress-header">
+      <span class="progress-label" id="progressLabel">Starting…</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </section>
+
+  <!-- Error Box -->
+  <div class="error-box" id="errorBox" role="alert" aria-live="assertive">
+    <span class="error-icon">⚠️</span>
+    <span id="errorText"></span>
+  </div>
+
+  <!-- Audio Player -->
+  <section class="audio-section" id="audioSection" aria-label="Generated audio">
+    <div class="audio-heading">Generated Audio</div>
+    <div class="audio-player-wrap">
+      <button class="play-btn" id="playBtn" aria-label="Play audio">▶</button>
+      <div class="waveform-wrap">
+        <audio id="audioPlayer" controls preload="auto"></audio>
+      </div>
+      <a id="downloadBtn" class="download-btn" download="speech.wav">⬇ Download</a>
+    </div>
+  </section>
+
+  <!-- Footer pills -->
+  <footer class="footer">
+    <span class="pill">🔒 Local only</span>
+    <span class="pill">No API keys</span>
+    <span class="pill">Chatterbox TTS</span>
+    <span class="pill" id="modeLabel">Loading…</span>
+  </footer>
+</main>
+
+<script>
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+  const textInput      = document.getElementById('textInput');
+  const generateBtn    = document.getElementById('generateBtn');
+  const btnLabel       = document.getElementById('btnLabel');
+  const waveformBars   = document.getElementById('waveformBars');
+  const charCount      = document.getElementById('charCount');
+
+  const statusBadge    = document.getElementById('statusBadge');
+  const statusDot      = document.getElementById('statusDot');
+  const statusText     = document.getElementById('statusText');
+  const deviceBadge    = document.getElementById('deviceBadge');
+  const modeLabel      = document.getElementById('modeLabel');
+
+  const progressSection = document.getElementById('progressSection');
+  const progressLabel   = document.getElementById('progressLabel');
+  const progressPct     = document.getElementById('progressPct');
+  const progressFill    = document.getElementById('progressFill');
+  const progressBar     = document.getElementById('progressBar');
+
+  const errorBox       = document.getElementById('errorBox');
+  const errorText      = document.getElementById('errorText');
+
+  const audioSection   = document.getElementById('audioSection');
+  const audioPlayer    = document.getElementById('audioPlayer');
+  const playBtn        = document.getElementById('playBtn');
+  const downloadBtn    = document.getElementById('downloadBtn');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  let pollTimer    = null;
+  let statusTimer  = null;
+  let isReady      = false;
+  let currentJobId = null;
+  let isGenerating = false;
+
+  // ── Char count ──────────────────────────────────────────────────────────────
+  textInput.addEventListener('input', () => {
+    charCount.textContent = textInput.value.length;
+  });
+
+  // ── Status polling ──────────────────────────────────────────────────────────
+  async function pollStatus() {
+    try {
+      const res  = await fetch('/api/status');
+      const data = await res.json();
+
+      const { modelLoaded, cloneReady, device, error, serviceUp } = data;
+
+      deviceBadge.textContent = device ? device.toUpperCase() : '?';
+      modeLabel.textContent   = device === 'cuda' ? '⚡ GPU Mode' : '🐢 CPU Mode';
+
+      if (!serviceUp || !modelLoaded) {
+        setStatus('loading', error ? `Error: ${error}` : 'Loading model…');
+        setReady(false);
+      } else if (!cloneReady) {
+        setStatus('loading', error ? `Clone error: ${error}` : 'Cloning voice…');
+        setReady(false);
+      } else {
+        setStatus('ready', 'Clone ready');
+        setReady(true);
+      }
+    } catch (e) {
+      setStatus('error', 'Service unreachable');
+      setReady(false);
+    }
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = 'dot ' + state;
+    statusText.textContent = text;
+  }
+
+  function setReady(ready) {
+    isReady = ready;
+    if (!isGenerating) {
+      textInput.disabled  = !ready;
+      generateBtn.disabled = !ready;
+    }
+  }
+
+  // Start status polling (every 2.5 s)
+  pollStatus();
+  statusTimer = setInterval(pollStatus, 2500);
+
+  // ── Generate ────────────────────────────────────────────────────────────────
+  generateBtn.addEventListener('click', async () => {
+    const text = textInput.value.trim();
+    if (!text) { showError('Please enter some text first.'); return; }
+    if (!isReady) { showError('Voice clone not ready yet. Please wait.'); return; }
+
+    hideError();
+    hideAudio();
+    setGenerating(true);
+
+    try {
+      const res  = await fetch('/api/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setGenerating(false);
+        showError(data.error || `HTTP ${res.status}`);
+        return;
+      }
+
+      currentJobId = data.jobId;
+      startJobPoll(currentJobId);
+    } catch (e) {
+      setGenerating(false);
+      showError(`Request failed: ${e.message}`);
+    }
+  });
+
+  function setGenerating(gen) {
+    isGenerating = gen;
+    generateBtn.disabled = gen || !isReady;
+    textInput.disabled   = gen;
+    btnLabel.textContent  = gen ? 'Generating…' : 'Generate Speech';
+    waveformBars.classList.toggle('idle', !gen);
+
+    if (gen) {
+      showProgress(0, 'Starting…');
+    } else {
+      progressSection.classList.remove('visible');
+    }
+  }
+
+  // ── Job Polling ─────────────────────────────────────────────────────────────
+  function startJobPoll(jobId) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => pollJob(jobId), 1500);
+  }
+
+  async function pollJob(jobId) {
+    try {
+      const res  = await fetch(`/api/job/${jobId}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        clearInterval(pollTimer);
+        setGenerating(false);
+        showError(data.error || 'Job poll failed.');
+        return;
+      }
+
+      const { status, percent, label, resultUrl, error } = data;
+      showProgress(percent, label);
+      progressBar.setAttribute('aria-valuenow', percent);
+
+      if (status === 'done' && resultUrl) {
+        clearInterval(pollTimer);
+        setGenerating(false);
+        progressSection.classList.remove('visible');
+        showAudio(`${resultUrl}?t=${Date.now()}`);
+      } else if (status === 'failed') {
+        clearInterval(pollTimer);
+        setGenerating(false);
+        progressSection.classList.remove('visible');
+        showError(error || 'Synthesis failed. Check server logs.');
+      }
+    } catch (e) {
+      // Network hiccup; keep polling
+    }
+  }
+
+  // ── Progress ────────────────────────────────────────────────────────────────
+  function showProgress(pct, label) {
+    progressSection.classList.add('visible');
+    progressLabel.textContent = label || 'Processing…';
+    progressPct.textContent   = `${pct}%`;
+    progressFill.style.width  = `${pct}%`;
+  }
+
+  // ── Audio ───────────────────────────────────────────────────────────────────
+  function showAudio(url) {
+    audioSection.classList.add('visible');
+    audioPlayer.src = url;
+    downloadBtn.href = url;
+    audioPlayer.play().catch(() => {});
+  }
+
+  function hideAudio() {
+    audioSection.classList.remove('visible');
+    audioPlayer.pause();
+    audioPlayer.src = '';
+  }
+
+  // ── Play button toggle ──────────────────────────────────────────────────────
+  playBtn.addEventListener('click', () => {
+    if (audioPlayer.paused) {
+      audioPlayer.play();
+      playBtn.textContent = '⏸';
+    } else {
+      audioPlayer.pause();
+      playBtn.textContent = '▶';
+    }
+  });
+
+  audioPlayer.addEventListener('play',  () => { playBtn.textContent = '⏸'; });
+  audioPlayer.addEventListener('pause', () => { playBtn.textContent = '▶'; });
+  audioPlayer.addEventListener('ended', () => { playBtn.textContent = '▶'; });
+
+  // ── Errors ──────────────────────────────────────────────────────────────────
+  function showError(msg) {
+    errorText.textContent = msg;
+    errorBox.classList.add('visible');
+  }
+  function hideError() {
+    errorBox.classList.remove('visible');
+  }
+</script>
+
+</body>
+</html>

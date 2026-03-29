@@ -1,0 +1,16 @@
+{
+  "name": "own-voice-tts",
+  "version": "1.0.0",
+  "description": "Local Own Voice Text-to-Speech using Chatterbox TTS",
+  "type": "module",
+  "scripts": {
+    "voice:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-local-voice.ps1",
+    "express:voice": "node express-clone/server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "uuid": "^9.0.1",
+    "wavefile": "^11.0.0"
+  }
+}

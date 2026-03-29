@@ -1,0 +1,8 @@
+node_modules/
+runtime-logs/
+myvoice_ref.wav
+dataset/
+__pycache__/
+*.pyc
+.env
+*.log
