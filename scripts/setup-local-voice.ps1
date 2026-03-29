@@ -85,19 +85,20 @@ if ($LASTEXITCODE -ne 0) {
 # -- 5b. Upgrade torch to CUDA build if GPU available
 if ($hasCuda) {
     Write-Host "      Upgrading torch to CUDA 12.4 build (required for GTX 1650)..." -ForegroundColor Cyan
-    # torch 2.6.0 is available with cu124; cu121 does not have a 2.6.0 build
+    # torch 2.6.0 is available with cu124; matching torchvision is 0.21.0
     python -m pip install `
         "torch==2.6.0+cu124" `
         "torchaudio==2.6.0+cu124" `
+        "torchvision==0.21.0+cu124" `
         --index-url https://download.pytorch.org/whl/cu124 `
         --quiet
     if ($LASTEXITCODE -ne 0) {
         Write-Host "      WARN: CUDA torch install failed - falling back to CPU torch 2.6.0" -ForegroundColor Yellow
-        python -m pip install "torch==2.6.0" "torchaudio==2.6.0" --quiet
+        python -m pip install "torch==2.6.0" "torchaudio==2.6.0" "torchvision==0.21.0" --quiet
     }
 } else {
     Write-Host "      Ensuring CPU torch==2.6.0..." -ForegroundColor Gray
-    python -m pip install "torch==2.6.0" "torchaudio==2.6.0" --quiet
+    python -m pip install "torch==2.6.0" "torchaudio==2.6.0" "torchvision==0.21.0" --quiet
 }
 
 # -- 5c. accelerate: required by transformers for LlamaModel to load correctly
