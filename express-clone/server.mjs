@@ -75,6 +75,7 @@ setInterval(() => {
 
 // ─── Python Service Lifecycle ─────────────────────────────────────────────────
 let pyProcess = null;
+let isStarting = false;
 
 async function isVoiceServiceUp() {
   try {
@@ -86,9 +87,10 @@ async function isVoiceServiceUp() {
 }
 
 async function ensureVoiceService() {
-  if (await isVoiceServiceUp()) return;
+  if (isStarting || await isVoiceServiceUp()) return;
+  isStarting = true;
 
-  log("Starting Python voice service…");
+  log("Starting Python voice service...");
   const appPy = path.join(ROOT, "voice_service", "app.py");
 
   pyProcess = spawn(
@@ -114,10 +116,12 @@ async function ensureVoiceService() {
   while (Date.now() < deadline) {
     await sleep(2000);
     if (await isVoiceServiceUp()) {
+      isStarting = false;
       log("Python voice service is up.");
       return;
     }
   }
+  isStarting = false;
   log("WARNING: Python voice service did not come up within 90 s; continuing anyway.");
 }
 
@@ -131,7 +135,7 @@ async function ensureVoiceService() {
 function splitIntoChunks(text) {
   // Split on sentence boundaries
   const sentences = text
-    .replace(/([.!?…]+)\s+/g, "$1\n")
+    .replace(/([.!?...]+)\s+/g, "$1\n")
     .split("\n")
     .map(s => s.trim())
     .filter(Boolean);
@@ -208,7 +212,7 @@ async function runSynthesisJob(jobId, text) {
   const chunks = splitIntoChunks(text);
   log(`Job ${jobId}: ${chunks.length} chunk(s) for ${text.length} chars`);
 
-  updateJob(jobId, { status: "running", percent: 2, label: "Starting synthesis…" });
+  updateJob(jobId, { status: "running", percent: 2, label: "Starting synthesis..." });
 
   const chunkPaths = [];
 
@@ -218,10 +222,10 @@ async function runSynthesisJob(jobId, text) {
     const pct = Math.round(5 + ((i / chunks.length) * 85));
     updateJob(jobId, {
       percent: pct,
-      label: `Generating chunk ${i + 1}/${chunks.length}…`,
+      label: `Generating chunk ${i + 1}/${chunks.length}...`,
     });
 
-    log(`Job ${jobId} chunk ${i + 1}/${chunks.length}: "${chunk.slice(0, 60)}…"`);
+    log(`Job ${jobId} chunk ${i + 1}/${chunks.length}: "${chunk.slice(0, 60)}..."`);
 
     let attempt = 0;
     const MAX_ATTEMPTS = 3;
@@ -249,7 +253,7 @@ async function runSynthesisJob(jobId, text) {
   }
 
   // Merge
-  updateJob(jobId, { percent: 93, label: "Merging audio chunks…" });
+  updateJob(jobId, { percent: 93, label: "Merging audio chunks..." });
   const finalPath = path.join(AUDIO_DIR, `${jobId}_final.wav`);
   await mergeWavFiles(chunkPaths, finalPath);
 
@@ -262,7 +266,7 @@ async function runSynthesisJob(jobId, text) {
     status: "done", percent: 100, label: "Done",
     resultPath: finalPath,
   });
-  log(`Job ${jobId} complete → ${finalPath}`);
+  log(`Job ${jobId} complete -> ${finalPath}`);
 }
 
 // ─── Express App ──────────────────────────────────────────────────────────────
@@ -362,7 +366,7 @@ app.get("/api/job/:id", (req, res) => {
   res.json({ id, status, percent, label, resultUrl, error });
 });
 
-// GET /api/audio/:jobId → stream final wav
+// GET /api/audio/:jobId -> stream final wav
 app.get("/api/audio/:jobId", (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) return res.status(404).json({ error: "Job not found." });
@@ -378,7 +382,7 @@ app.get("/api/audio/:jobId", (req, res) => {
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 app.listen(EXPRESS_PORT, "127.0.0.1", async () => {
-  log(`Server listening → http://127.0.0.1:${EXPRESS_PORT}`);
+  log(`Server listening -> http://127.0.0.1:${EXPRESS_PORT}`);
   await ensureVoiceService();
   log("Init complete. Ready.");
 });

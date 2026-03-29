@@ -72,7 +72,7 @@ def _load_model():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     state["device"] = device
-    print(f"[VoiceService] Loading ChatterboxTTS on {device.upper()}…", flush=True)
+    print(f"[VoiceService] Loading ChatterboxTTS on {device.upper()}...", flush=True)
 
     model = ChatterboxTTS.from_pretrained(device=device)
     state["model"] = model
@@ -82,7 +82,7 @@ def _load_model():
 
 
 def _prepare_clone():
-    """Convert reference audio (.webm/.weba/.wav) → PCM WAV, then warm-up."""
+    """Convert reference audio (.webm/.weba/.wav) -> PCM WAV, then warm-up."""
     global state
 
     ref_audio = _find_ref_audio()
@@ -103,17 +103,17 @@ def _prepare_clone():
         or REF_WAV_PATH.stat().st_mtime < ref_audio.stat().st_mtime
     )
     if needs_convert:
-        print("[VoiceService] Converting reference audio to PCM WAV…", flush=True)
+        print("[VoiceService] Converting reference audio to PCM WAV...", flush=True)
         ret = os.system(
             f'ffmpeg -y -i "{ref_audio}" -ar 22050 -ac 1 -f wav "{REF_WAV_PATH}" >nul 2>&1'
         )
         if ret != 0 or not REF_WAV_PATH.exists():
-            state["load_error"] = f"ffmpeg failed to convert {ref_audio.name} → myvoice_ref.wav"
+            state["load_error"] = f"ffmpeg failed to convert {ref_audio.name} -> myvoice_ref.wav"
             print(f"[VoiceService] {state['load_error']}", flush=True)
             return
 
     # Warm-up: generate 1 second of speech, discard, ensures clone embeddings cached
-    print("[VoiceService] Warming up clone voice (first inference)…", flush=True)
+    print("[VoiceService] Warming up clone voice (first inference)...", flush=True)
     try:
         _synthesize_chunk("Hello.", str(REF_WAV_PATH), str(AUDIO_DIR / "_warmup.wav"))
         (AUDIO_DIR / "_warmup.wav").unlink(missing_ok=True)
