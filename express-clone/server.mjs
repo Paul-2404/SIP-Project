@@ -180,6 +180,39 @@ function splitIntoChunks(text) {
 // ─── ffmpeg Helpers ───────────────────────────────────────────────────────────
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+/** Locates ffmpeg.exe by checking PATH, then WinGet folders. */
+function getFfmpegPath() {
+  try {
+    // 1. Check path via execSync
+    execSync("ffmpeg -version", { stdio: "ignore" });
+    return "ffmpeg";
+  } catch {
+    // 2. Search common WinGet locations
+    const localAppData = process.env.LOCALAPPDATA;
+    if (localAppData) {
+      const wingetDir = path.join(localAppData, "Microsoft", "WinGet", "Packages");
+      if (existsSync(wingetDir)) {
+        const pkgs = readdirSync(wingetDir);
+        for (const pkg of pkgs) {
+          if (pkg.includes("Gyan.FFmpeg")) {
+            // Find deep ffmpeg.exe (usually in a bin subfolder)
+            const fullDir = path.join(wingetDir, pkg);
+            // Simple recursive search (1 level deep is usually enough for the extracted zip)
+            const subfolders = readdirSync(fullDir);
+            for (const sub of subfolders) {
+              const bin = path.join(fullDir, sub, "bin", "ffmpeg.exe");
+              if (existsSync(bin)) return bin;
+              const direct = path.join(fullDir, sub, "ffmpeg.exe");
+              if (existsSync(direct)) return direct;
+            }
+          }
+        }
+      }
+    }
+    return "ffmpeg"; // Final fallback
+  }
+}
+
 async function mergeWavFiles(chunkPaths, outPath) {
   if (chunkPaths.length === 1) {
     // No merge needed
@@ -193,7 +226,7 @@ async function mergeWavFiles(chunkPaths, outPath) {
   await writeFile(listPath, listContent, "utf8");
 
   await new Promise((resolve, reject) => {
-    const ff = spawn("ffmpeg", [
+    const ff = spawn(getFfmpegPath(), [
       "-y", "-f", "concat", "-safe", "0",
       "-i", listPath,
       "-c", "copy",

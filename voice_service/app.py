@@ -81,9 +81,28 @@ def _load_model():
     print("[VoiceService] Model loaded.", flush=True)
 
 
+def _get_ffmpeg_path():
+    """Locate ffmpeg.exe, trying PATH first, then typical WinGet/Local locations."""
+    import shutil
+    # 1. Try PATH
+    p = shutil.which("ffmpeg")
+    if p: return p
+
+    # 2. Try typical WinGet locations for Gyan.FFmpeg
+    user_appdata = os.environ.get("LOCALAPPDATA")
+    if user_appdata:
+        winget_pkgs = Path(user_appdata) / "Microsoft/WinGet/Packages"
+        if winget_pkgs.exists():
+            for pkg_dir in winget_pkgs.glob("Gyan.FFmpeg*"):
+                for exe in pkg_dir.rglob("ffmpeg.exe"):
+                    return str(exe)
+    
+    return "ffmpeg"
+
 def _prepare_clone():
     """Convert reference audio (.webm/.weba/.wav) -> PCM WAV, then warm-up."""
     global state
+    import subprocess
 
     ref_audio = _find_ref_audio()
     if ref_audio is None:
@@ -103,12 +122,18 @@ def _prepare_clone():
         or REF_WAV_PATH.stat().st_mtime < ref_audio.stat().st_mtime
     )
     if needs_convert:
-        print("[VoiceService] Converting reference audio to PCM WAV...", flush=True)
-        ret = os.system(
-            f'ffmpeg -y -i "{ref_audio}" -ar 22050 -ac 1 -f wav "{REF_WAV_PATH}" >nul 2>&1'
-        )
-        if ret != 0 or not REF_WAV_PATH.exists():
-            state["load_error"] = f"ffmpeg failed to convert {ref_audio.name} -> myvoice_ref.wav"
+        ffmpeg_bin = _get_ffmpeg_path()
+        print(f"[VoiceService] Converting reference audio with {ffmpeg_bin}...", flush=True)
+        try:
+            cmd = [ffmpeg_bin, "-y", "-i", str(ref_audio), "-ar", "22050", "-ac", "1", "-f", "wav", str(REF_WAV_PATH)]
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+        except Exception as e:
+            state["load_error"] = f"ffmpeg conversion failed: {str(e)}"
+            print(f"[VoiceService] {state['load_error']}", flush=True)
+            return
+
+        if not REF_WAV_PATH.exists():
+            state["load_error"] = f"ffmpeg failed to produce output -> {REF_WAV_PATH.name}"
             print(f"[VoiceService] {state['load_error']}", flush=True)
             return
 
