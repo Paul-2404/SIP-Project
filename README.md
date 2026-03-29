@@ -12,15 +12,20 @@ No paid APIs. Runs entirely on your machine. GPU-accelerated (GTX 1650+) or CPU 
 - Node.js 20+
 - Python 3.11
 - NVIDIA GPU (optional — CPU fallback works, slower)
-- `myvoice.weba` in project root (10–30 seconds of clean speech)
+- A voice reference file in the project root (10–30 seconds of clean speech):
+  `myvoice.webm` **or** `myvoice.weba` **or** `myvoice.wav`
 
 ### 1. Add your voice reference
 
-Record or export a clean 10–30 second audio sample of your voice and save it as:
-```
-myvoice.weba
-```
-at the project root. WebM/Opus audio from browser `MediaRecorder` works perfectly.
+Record or export a clean 10–30 second audio sample of your voice and save it as **any** of:
+
+| Filename | Format | Notes |
+|----------|--------|-------|
+| `myvoice.webm` | WebM/Opus | ✅ Browser `MediaRecorder` output |
+| `myvoice.weba` | WebM Audio | ✅ Same container, audio-only variant |
+| `myvoice.wav` | PCM WAV | ✅ Skips ffmpeg conversion step |
+
+Place the chosen file in the **project root**. The app auto-detects whichever is present (`.webm` checked first).
 
 ### 2. Install everything
 ```powershell

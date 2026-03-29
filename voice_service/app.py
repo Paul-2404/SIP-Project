@@ -24,8 +24,17 @@ BASE_DIR = Path(__file__).parent.parent
 AUDIO_DIR = BASE_DIR / "runtime-logs" / "express-clone"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
-REF_AUDIO_PATH = BASE_DIR / "myvoice.weba"
-REF_WAV_PATH = BASE_DIR / "myvoice_ref.wav"   # converted reference
+# Accept .webm, .weba, or .wav — whichever the user drops in first
+_REF_CANDIDATES = ["myvoice.webm", "myvoice.weba", "myvoice.wav"]
+
+def _find_ref_audio() -> Path | None:
+    for name in _REF_CANDIDATES:
+        p = BASE_DIR / name
+        if p.exists() and p.stat().st_size > 100:
+            return p
+    return None
+
+REF_WAV_PATH = BASE_DIR / "myvoice_ref.wav"   # converted PCM reference
 
 # ─── App State ────────────────────────────────────────────────────────────────
 app = FastAPI(title="OwnVoice TTS Service")
@@ -73,22 +82,33 @@ def _load_model():
 
 
 def _prepare_clone():
-    """Convert reference .weba → .wav then warm-up with a test phrase."""
+    """Convert reference audio (.webm/.weba/.wav) → PCM WAV, then warm-up."""
     global state
 
-    if not REF_AUDIO_PATH.exists():
-        print(f"[VoiceService] Reference audio not found: {REF_AUDIO_PATH}", flush=True)
+    ref_audio = _find_ref_audio()
+    if ref_audio is None:
+        accepted = ", ".join(_REF_CANDIDATES)
+        msg = f"Reference audio not found. Place one of [{accepted}] in the project root."
+        print(f"[VoiceService] {msg}", flush=True)
+        state["load_error"] = msg
         state["clone_ready"] = False
         return
 
-    # Convert weba → wav using ffmpeg if not already done
-    if not REF_WAV_PATH.exists() or REF_WAV_PATH.stat().st_size < 1000:
+    print(f"[VoiceService] Using reference audio: {ref_audio.name}", flush=True)
+
+    # Convert to PCM WAV using ffmpeg if not already done (or if source changed)
+    needs_convert = (
+        not REF_WAV_PATH.exists()
+        or REF_WAV_PATH.stat().st_size < 1000
+        or REF_WAV_PATH.stat().st_mtime < ref_audio.stat().st_mtime
+    )
+    if needs_convert:
         print("[VoiceService] Converting reference audio to PCM WAV…", flush=True)
         ret = os.system(
-            f'ffmpeg -y -i "{REF_AUDIO_PATH}" -ar 22050 -ac 1 -f wav "{REF_WAV_PATH}" >nul 2>&1'
+            f'ffmpeg -y -i "{ref_audio}" -ar 22050 -ac 1 -f wav "{REF_WAV_PATH}" >nul 2>&1'
         )
         if ret != 0 or not REF_WAV_PATH.exists():
-            state["load_error"] = "ffmpeg failed to convert myvoice.weba → myvoice_ref.wav"
+            state["load_error"] = f"ffmpeg failed to convert {ref_audio.name} → myvoice_ref.wav"
             print(f"[VoiceService] {state['load_error']}", flush=True)
             return
 
